@@ -1,101 +1,173 @@
+"use client";  // Add this at the very top of the file
+
+import { useRef, useState, useEffect } from "react";
 import Image from "next/image";
+import { marked } from "marked";
+import parse from "html-react-parser";
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="https://nextjs.org/icons/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              app/page.js
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  const messageRef = useRef();
+  const [messages, setMessages] = useState([]);
+  const [displayedMessage, setDisplayedMessage] = useState("Hello human!");
+  const [loading, setLoading] = useState(false);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="https://nextjs.org/icons/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  // Reference for the bottom of the message list
+  const bottomRef = useRef(null);
+
+  // Scroll to bottom when messages are updated
+  useEffect(() => {
+    if (bottomRef.current) {
+      bottomRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const prompt = messageRef.current.value;
+    setLoading(true);
+
+    let newMessageList = [
+      ...messages,
+      {
+        role: "user",
+        content: prompt,
+      },
+    ];
+
+    try {
+      const response = await fetch("/api/bot", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json", 
+        },
+        body: JSON.stringify({ messages: newMessageList }),  // Send entire message list
+      });
+
+      if (!response.ok) {
+        throw new Error("Network response was not ok");
+      }
+
+      const data = await response.json();
+
+      // Check if the response is valid and add it
+      if (data.response) {
+        newMessageList.push({
+          role: data.response.role,
+          content: data.response.content, // Handle the single response object
+        });
+
+        setMessages(newMessageList);
+        setDisplayedMessage(data.response.content || ""); // Set the single response to displayedMessage
+      } else {
+        console.error("No valid response received from assistant.");
+      }
+
+      messageRef.current.value = "";
+    } catch (error) {
+      console.error("Error:", error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
+  return (
+    <main className="container mx-auto max-w-4xl">
+      <div className="grid grid-cols-5">
+        <div
+          className={`bg-green-400 col-span-4 relative py-4 px-4 flex flex-col justify-center ${
+            loading ? "animate-pulse" : ""
+          }`}
+        >
+          <div className="absolute h-[15px] w-[15px] bg-green-400 -right-[7px] top-[7%] rotate-45"></div>
+          <h3 className="text-2xl text-white font-bold">Ele says:</h3>
+          <div className="text-white">
+          {loading ? "I am preparing your answer.." : parse(marked(displayedMessage || ""))}
+
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
+
+        <div>
           <Image
-            aria-hidden
-            src="https://nextjs.org/icons/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
+            priority
+            src="/robopic.png"
+            width={300}
+            height={300}
+            alt="robot"
           />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
+        </div>
+      </div>
+
+      <form className="mt-6" onSubmit={handleSubmit}>
+        <div className="flex flex-col gap-4">
+          <label className="font-bold">Ask me something...</label>
+          <input
+            className="px-5 py-2 text-gray-700 placeholder-gray-500 bg-white border-gray-700 rounded-lg"
+            required
+            type="text"
+            placeholder="Type your question"
+            ref={messageRef}
+          ></input>
+        </div>
+        <button
+          type="submit"
+          className="px-4 py-2 mt-2 text-black-700 bg-blue border border-red-700 rounded-lg hover:scale-110 transition-all duration-200"
         >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+          Send message
+        </button>
+      </form>
+
+      <div className="mt-6 h-[400px] overflow-y-scroll">
+        {messages.map((message, index) => (
+          <div
+            key={index}
+            className={`flex items-start gap-4 py-2 ${
+              message.role === "user" ? "justify-end" : "justify-start"
+            }`}
+          >
+            {/* Message Section */}
+            {message.role === "user" ? (
+              <>
+                <div className="w-[90%] text-right">
+                  <p className="text-black bg-blue-500 text-white p-3 rounded-lg inline-block">
+                    <strong>You: </strong>
+                    {message.content}
+                  </p>
+                </div>
+                <div className="w-[50px]">
+                  <Image
+                    src="/user.png" // Add your user avatar image
+                    width={50}
+                    height={50}
+                    alt="User"
+                    className="rounded-full"
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="w-[50px]">
+                  <Image
+                    src="/robot.png" // Add your bot avatar image
+                    width={50}
+                    height={50}
+                    alt="Bot"
+                    className="rounded-full"
+                  />
+                </div>
+                <div className="w-[90%] text-left">
+                  <p className="text-black bg-gray-300 p-3 rounded-lg inline-block">
+                    <strong>Ele: </strong>
+                    {message.content}
+                  </p>
+                </div>
+              </>
+            )}
+          </div>
+        ))}
+        {/* Ref element to automatically scroll to */}
+        <div ref={bottomRef} />
+      </div>
+    </main>
   );
 }
